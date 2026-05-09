@@ -197,6 +197,61 @@ console.log(context.dump(moduleExports))
 moduleExports.dispose()
 ```
 
+#### Trusted Bytecode
+
+QuickJS can serialize compiled code to bytecode and load it later. This is only
+safe for code you already trust. Do not load bytecode from untrusted sources.
+
+`dumpBytecode()` returns host bytes, so you can cache or persist them outside
+the VM and later load them into a fresh context with `loadBytecode()`.
+
+```typescript
+const QuickJS = await getQuickJS()
+
+using compileContext = QuickJS.newContext()
+using compiled = compileContext.unwrapResult(
+  compileContext.compileToBytecodeHandle("globalThis.answer = 40 + 2; answer", "eval.js", {
+    type: "global",
+  }),
+)
+const bytecode = compileContext.dumpBytecode(compiled)
+
+using runtimeContext = QuickJS.newContext()
+using loaded = runtimeContext.unwrapResult(runtimeContext.loadBytecode(bytecode))
+using result = runtimeContext.unwrapResult(runtimeContext.evalFunction(loaded))
+
+console.log(runtimeContext.getNumber(result)) // 42
+```
+
+For modules, resolve imports before evaluation:
+
+```typescript
+const runtime = QuickJS.newRuntime({
+  moduleLoader: (moduleName) => {
+    if (moduleName === "dep") {
+      return "export const value = 9"
+    }
+    throw new Error(`Unknown module: ${moduleName}`)
+  },
+})
+using context = runtime.newContext()
+
+using compiled = context.unwrapResult(
+  context.compileToBytecodeHandle(
+    "import { value } from 'dep'; export const answer = value * 7",
+    "module.js",
+    { type: "module" },
+  ),
+)
+const bytecode = context.dumpBytecode(compiled)
+
+using loaded = context.unwrapResult(context.loadBytecode(bytecode))
+context.resolveModule(loaded)
+using namespace = context.unwrapResult(context.evalFunction(loaded))
+
+console.log(context.getProp(namespace, "answer").consume(context.getNumber)) // 63
+```
+
 ### Memory Management
 
 Many methods in this library return handles to memory allocated inside the

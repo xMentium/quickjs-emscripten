@@ -1,6 +1,11 @@
-import { IsEqualOp, JSPromiseStateEnum } from "@jitl/quickjs-ffi-types"
-import type {
+import {
   EvalFlags,
+  IsEqualOp,
+  JSPromiseStateEnum,
+  ReadObjectFlags,
+  WriteObjectFlags,
+} from "@jitl/quickjs-ffi-types"
+import type {
   EitherModule,
   EvalDetectModule,
   JSBorrowedCharPointer,
@@ -1530,6 +1535,87 @@ export class QuickJSContext
   decodeBinaryJSON(handle: QuickJSHandle): QuickJSHandle {
     const ptr = this.ffi.QTS_bjson_decode(this.ctx.value, handle.value)
     return this.memory.heapValueHandle(ptr)
+  }
+
+  /**
+   * Serialize a trusted compiled function or module handle to QuickJS bytecode.
+   *
+   * This is version-specific and must only be loaded in a compatible QuickJS build.
+   */
+  dumpBytecode(
+    handle: QuickJSHandle,
+    flags: number = WriteObjectFlags.JS_WRITE_OBJ_BYTECODE | WriteObjectFlags.JS_WRITE_OBJ_REFERENCE,
+  ): Uint8Array {
+    this.runtime.assertOwned(handle)
+    const ptr = this.ffi.QTS_WriteObject(this.ctx.value, handle.value, flags)
+    const errorPtr = this.ffi.QTS_ResolveException(this.ctx.value, ptr)
+    if (errorPtr) {
+      this.ffi.QTS_FreeValuePointer(this.ctx.value, ptr)
+      throw this.unwrapResult(this.fail(this.memory.heapValueHandle(errorPtr)))
+    }
+    return this.memory.heapValueHandle(ptr).consume((bytecodeHandle) =>
+      this.getArrayBuffer(bytecodeHandle).consume(
+        (bytes) => new Uint8Array(bytes.value.slice()),
+      ),
+    )
+  }
+
+  /**
+   * Load trusted QuickJS bytecode from host bytes.
+   *
+   * This does not execute the loaded function/module.
+   */
+  loadBytecode(
+    bytecode: Uint8Array | ArrayBuffer,
+    flags: number = ReadObjectFlags.JS_READ_OBJ_BYTECODE | ReadObjectFlags.JS_READ_OBJ_REFERENCE,
+  ): QuickJSContextResult<QuickJSHandle> {
+    const buffer = bytecode instanceof Uint8Array ? bytecode.slice().buffer : bytecode
+    return this.newArrayBuffer(buffer).consume((handle) => {
+      const ptr = this.ffi.QTS_ReadObject(this.ctx.value, handle.value, flags)
+      const errorPtr = this.ffi.QTS_ResolveException(this.ctx.value, ptr)
+      if (errorPtr) {
+        this.ffi.QTS_FreeValuePointer(this.ctx.value, ptr)
+        return this.fail(this.memory.heapValueHandle(errorPtr))
+      }
+      return this.success(this.memory.heapValueHandle(ptr))
+    })
+  }
+
+  /**
+   * Compile source to a QuickJS function/module object without executing it.
+   */
+  compileToBytecodeHandle(
+    code: string,
+    filename: string = "eval.js",
+    options?: number | ContextEvalOptions,
+  ): QuickJSContextResult<QuickJSHandle> {
+    const flags = evalOptionsToFlags(options)
+    return this.evalCode(code, filename, flags | EvalFlags.JS_EVAL_FLAG_COMPILE_ONLY)
+  }
+
+  /**
+   * Resolve imports for a trusted compiled module handle before evaluation.
+   */
+  resolveModule(handle: QuickJSHandle): void {
+    this.runtime.assertOwned(handle)
+    const errorPtr = this.ffi.QTS_ResolveModule(this.ctx.value, handle.value)
+    if (errorPtr) {
+      throw this.unwrapResult(this.fail(this.memory.heapValueHandle(errorPtr)))
+    }
+  }
+
+  /**
+   * Execute a trusted compiled function or module handle.
+   */
+  evalFunction(handle: QuickJSHandle): QuickJSContextResult<QuickJSHandle> {
+    this.runtime.assertOwned(handle)
+    const ptr = this.ffi.QTS_EvalFunction(this.ctx.value, handle.value)
+    const errorPtr = this.ffi.QTS_ResolveException(this.ctx.value, ptr)
+    if (errorPtr) {
+      this.ffi.QTS_FreeValuePointer(this.ctx.value, ptr)
+      return this.fail(this.memory.heapValueHandle(errorPtr))
+    }
+    return this.success(this.memory.heapValueHandle(ptr))
   }
 
   protected success<S>(value: S): DisposableSuccess<S> {

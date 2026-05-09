@@ -24,6 +24,8 @@ import {
   GetOwnPropertyNamesFlags,
   IsEqualOp,
   HostRefId,
+  WriteObjectFlags,
+  ReadObjectFlags,
   JSPromiseStateEnum,
   assertSync,
 } from "@jitl/quickjs-ffi-types"
@@ -375,6 +377,36 @@ export class QuickJSAsyncFFI {
     ["number", "number", "number", "number", "number"],
     { async: true },
   )
+
+  QTS_EvalFunction: (
+    ctx: JSContextPointer,
+    fun_obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer = this.module.cwrap("QTS_EvalFunction", "number", ["number", "number"])
+
+  QTS_ResolveModule: (
+    ctx: JSContextPointer,
+    obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer = this.module.cwrap("QTS_ResolveModule", "number", ["number", "number"])
+
+  QTS_WriteObject: (
+    ctx: JSContextPointer,
+    obj: JSValuePointer | JSValueConstPointer,
+    flags: number,
+  ) => JSValuePointer = this.module.cwrap("QTS_WriteObject", "number", [
+    "number",
+    "number",
+    "number",
+  ])
+
+  QTS_ReadObject: (
+    ctx: JSContextPointer,
+    data: JSValuePointer | JSValueConstPointer,
+    flags: number,
+  ) => JSValuePointer = this.module.cwrap("QTS_ReadObject", "number", [
+    "number",
+    "number",
+    "number",
+  ])
 
   QTS_ResolveException: (ctx: JSContextPointer, maybe_exception: JSValuePointer) => JSValuePointer =
     this.module.cwrap("QTS_ResolveException", "number", ["number", "number"])

@@ -24,6 +24,8 @@ import {
   GetOwnPropertyNamesFlags,
   IsEqualOp,
   HostRefId,
+  WriteObjectFlags,
+  ReadObjectFlags,
   JSPromiseStateEnum,
   assertSync,
 } from "."
@@ -187,6 +189,24 @@ export interface QuickJSAsyncFFI {
     argc: number,
     argv_ptrs: JSValueConstPointerPointer,
   ) => JSValuePointer | Promise<JSValuePointer>
+  QTS_EvalFunction: (
+    ctx: JSContextPointer,
+    fun_obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer
+  QTS_ResolveModule: (
+    ctx: JSContextPointer,
+    obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer
+  QTS_WriteObject: (
+    ctx: JSContextPointer,
+    obj: JSValuePointer | JSValueConstPointer,
+    flags: number,
+  ) => JSValuePointer
+  QTS_ReadObject: (
+    ctx: JSContextPointer,
+    data: JSValuePointer | JSValueConstPointer,
+    flags: number,
+  ) => JSValuePointer
   QTS_ResolveException: (ctx: JSContextPointer, maybe_exception: JSValuePointer) => JSValuePointer
   QTS_Dump: (
     ctx: JSContextPointer,

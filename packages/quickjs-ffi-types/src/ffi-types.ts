@@ -131,6 +131,16 @@ export type IsEqualOp = Brand<number, "IsEqualOp">
 export type HostRefId = Brand<number, "HostRefId">
 
 /**
+ * @private
+ */
+export type WriteObjectFlags = Brand<number, "WriteObjectFlags">
+
+/**
+ * @private
+ */
+export type ReadObjectFlags = Brand<number, "ReadObjectFlags">
+
+/**
  * State of a promise.
  */
 export type JSPromiseStateEnum = Brand<
@@ -171,6 +181,30 @@ export const EvalFlags = {
   JS_EVAL_FLAG_COMPILE_ONLY: 1 << 5,
   /** don't include the stack frames before this eval in the Error() backtraces */
   JS_EVAL_FLAG_BACKTRACE_BARRIER: 1 << 6,
+} as const
+
+/** Bitfield options for JS_WriteObject() C function. */
+export const WriteObjectFlags = {
+  /** allow function/module */
+  JS_WRITE_OBJ_BYTECODE: 1 << 0,
+  /** byte swapped output */
+  JS_WRITE_OBJ_BSWAP: 1 << 1,
+  /** allow SharedArrayBuffer */
+  JS_WRITE_OBJ_SAB: 1 << 2,
+  /** allow object references to encode arbitrary object graph */
+  JS_WRITE_OBJ_REFERENCE: 1 << 3,
+} as const
+
+/** Bitfield options for JS_ReadObject() C function. */
+export const ReadObjectFlags = {
+  /** allow function/module */
+  JS_READ_OBJ_BYTECODE: 1 << 0,
+  /** avoid duplicating 'buf' data */
+  JS_READ_OBJ_ROM_DATA: 1 << 1,
+  /** allow SharedArrayBuffer */
+  JS_READ_OBJ_SAB: 1 << 2,
+  /** allow object references */
+  JS_READ_OBJ_REFERENCE: 1 << 3,
 } as const
 
 /** Bitfield options for QTS_NewContext intrinsics */

@@ -24,6 +24,8 @@ import {
   GetOwnPropertyNamesFlags,
   IsEqualOp,
   HostRefId,
+  WriteObjectFlags,
+  ReadObjectFlags,
   JSPromiseStateEnum,
 } from "@jitl/quickjs-ffi-types"
 
@@ -292,6 +294,36 @@ export class QuickJSFFI {
   ) => JSValuePointer = this.module.cwrap("QTS_Call", "number", [
     "number",
     "number",
+    "number",
+    "number",
+    "number",
+  ])
+
+  QTS_EvalFunction: (
+    ctx: JSContextPointer,
+    fun_obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer = this.module.cwrap("QTS_EvalFunction", "number", ["number", "number"])
+
+  QTS_ResolveModule: (
+    ctx: JSContextPointer,
+    obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer = this.module.cwrap("QTS_ResolveModule", "number", ["number", "number"])
+
+  QTS_WriteObject: (
+    ctx: JSContextPointer,
+    obj: JSValuePointer | JSValueConstPointer,
+    flags: number,
+  ) => JSValuePointer = this.module.cwrap("QTS_WriteObject", "number", [
+    "number",
+    "number",
+    "number",
+  ])
+
+  QTS_ReadObject: (
+    ctx: JSContextPointer,
+    data: JSValuePointer | JSValueConstPointer,
+    flags: number,
+  ) => JSValuePointer = this.module.cwrap("QTS_ReadObject", "number", [
     "number",
     "number",
     "number",

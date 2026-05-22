@@ -163,6 +163,13 @@ void qts_dump(JSContext *ctx, JSValueConst value) {
 
 // Forward declaration
 JSBorrowedChar *QTS_GetString(JSContext *ctx, JSValueConst *value);
+JSValue qts_resolve_func_data(
+    JSContext *ctx,
+    JSValueConst this_val,
+    int argc,
+    JSValueConst *argv,
+    int magic,
+    JSValue *func_data);
 
 // Special non-enumerable properties to include when dumping objects (e.g., Error properties)
 static const char *QTS_DUMP_SPECIAL_PROPS[] = {
@@ -972,6 +979,91 @@ MaybeAsync(JSValue *) QTS_Call(JSContext *ctx, JSValueConst *func_obj, JSValueCo
   return jsvalue_to_heap(JS_Call(ctx, *func_obj, *this_obj, argc, argv));
 }
 
+JSValue *QTS_EvalFunction(JSContext *ctx, JSValueConst *fun_obj) {
+  char msg[LOG_LEN];
+  JSValue eval_result = JS_EvalFunction(ctx, JS_DupValue(ctx, *fun_obj));
+
+  if (JS_IsException(eval_result) || JS_VALUE_GET_TAG(*fun_obj) != JS_TAG_MODULE) {
+    return jsvalue_to_heap(eval_result);
+  }
+
+  JSModuleDef *module = JS_VALUE_GET_PTR(*fun_obj);
+  if (module == NULL) {
+    JS_FreeValue(ctx, eval_result);
+    return jsvalue_to_heap(JS_ThrowInternalError(ctx, "Module compiled to null"));
+  }
+
+  JSPromiseStateEnum state = JS_PromiseState(ctx, eval_result);
+  IF_DEBUG {
+    snprintf(msg, LOG_LEN, "QTS_EvalFunction: eval_result JS_PromiseState = %i", state);
+    qts_log(msg);
+  }
+
+  if ((state == JS_PROMISE_FULFILLED) || (state == -1)) {
+    JS_FreeValue(ctx, eval_result);
+    return jsvalue_to_heap(JS_GetModuleNamespace(ctx, module));
+  } else if (state == JS_PROMISE_REJECTED) {
+    JS_Throw(ctx, JS_PromiseResult(ctx, eval_result));
+    JS_FreeValue(ctx, eval_result);
+    return jsvalue_to_heap(JS_EXCEPTION);
+  } else if (state == JS_PROMISE_PENDING) {
+    JSValue module_namespace = JS_GetModuleNamespace(ctx, module);
+    if (JS_IsException(module_namespace)) {
+      JS_FreeValue(ctx, eval_result);
+      return jsvalue_to_heap(module_namespace);
+    }
+
+    JSValue then_resolve_module_namespace = JS_NewCFunctionData(ctx, &qts_resolve_func_data, 0, 0, 1, &module_namespace);
+    JS_FreeValue(ctx, module_namespace);
+    if (JS_IsException(then_resolve_module_namespace)) {
+      JS_FreeValue(ctx, eval_result);
+      return jsvalue_to_heap(then_resolve_module_namespace);
+    }
+
+    JSAtom then_atom = JS_NewAtom(ctx, "then");
+    JSValue new_promise = JS_Invoke(ctx, eval_result, then_atom, 1, &then_resolve_module_namespace);
+    JS_FreeAtom(ctx, then_atom);
+    JS_FreeValue(ctx, then_resolve_module_namespace);
+    JS_FreeValue(ctx, eval_result);
+
+    return jsvalue_to_heap(new_promise);
+  }
+
+  return jsvalue_to_heap(eval_result);
+}
+
+JSValue *QTS_ResolveModule(JSContext *ctx, JSValueConst *obj) {
+  int status = JS_ResolveModule(ctx, *obj);
+  if (status < 0) {
+    return jsvalue_to_heap(JS_GetException(ctx));
+  }
+
+  return NULL;
+}
+
+JSValue *QTS_WriteObject(JSContext *ctx, JSValueConst *obj, int flags) {
+  size_t length;
+  uint8_t *buffer = JS_WriteObject(ctx, &length, *obj, flags);
+  if (!buffer) {
+    return jsvalue_to_heap(JS_EXCEPTION);
+  }
+
+  JSValue array = JS_NewArrayBufferCopy(ctx, buffer, length);
+  js_free(ctx, buffer);
+  return jsvalue_to_heap(array);
+}
+
+JSValue *QTS_ReadObject(JSContext *ctx, JSValueConst *data, int flags) {
+  size_t length;
+  uint8_t *buffer = JS_GetArrayBuffer(ctx, &length, *data);
+  if (!buffer) {
+    return jsvalue_to_heap(JS_EXCEPTION);
+  }
+
+  JSValue value = JS_ReadObject(ctx, buffer, length, flags);
+  return jsvalue_to_heap(value);
+}
+
 /**
  * If maybe_exception is an exception, get the error.
  * Otherwise, return NULL.
@@ -1092,6 +1184,11 @@ MaybeAsync(JSValue *) QTS_Eval(JSContext *ctx, BorrowedHeapChar *js_code, size_t
   IF_DEBUG {
     snprintf(msg, LOG_LEN, "QTS_Eval: eval_result = %d", JS_VALUE_GET_TAG(eval_result));
     qts_log(msg);
+  }
+
+  if ((evalFlags & JS_EVAL_FLAG_COMPILE_ONLY) != 0) {
+    QTS_DEBUG("QTS_Eval: compile-only result")
+    return jsvalue_to_heap(eval_result);
   }
 
   if (

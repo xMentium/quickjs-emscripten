@@ -25,7 +25,9 @@ import { HostRefMap } from "./host-ref"
  * @returns `true` to interrupt JS execution inside the VM.
  * @returns `false` or `undefined` to continue JS execution inside the VM.
  */
-export type InterruptHandler = (runtime: QuickJSRuntime) => boolean | undefined | void | Promise<boolean>
+export type InterruptHandler = (
+  runtime: QuickJSRuntime,
+) => boolean | undefined | void | Promise<boolean>
 
 /**
  * Used as an optional for the results of executing pendingJobs.

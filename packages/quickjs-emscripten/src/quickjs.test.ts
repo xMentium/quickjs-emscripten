@@ -1226,14 +1226,19 @@ function asyncContextTests(
   describe("asyncify functions", () => {
     it("resumes CPU-bound evaluation after an async interrupt", async () => {
       // Arrange
-      let interruptCount = 0
+      let loopStarted = false
+      let interruptYielded = false
       let hostTimerRan = false
+      vm.newFunction("markLoopStarted", () => {
+        loopStarted = true
+        return vm.undefined
+      }).consume((fn) => vm.setProp(vm.global, "markLoopStarted", fn))
       vm.runtime.setInterruptHandler(() => {
-        interruptCount++
-        if (interruptCount !== 1) {
+        if (!loopStarted || interruptYielded) {
           return false
         }
 
+        interruptYielded = true
         return new Promise((resolve) => {
           setTimeout(() => {
             hostTimerRan = true
@@ -1244,6 +1249,7 @@ function asyncContextTests(
 
       // Act
       const result = await vm.evalCodeAsync(`
+        markLoopStarted();
         let result = 0;
         for (let i = 0; i < 1_000_000; i++) {
           result += i;
@@ -1253,6 +1259,8 @@ function asyncContextTests(
 
       // Assert
       assert.equal(vm.unwrapResult(result).consume(vm.dump), 499999500000)
+      assert(loopStarted, "guest entered the CPU-bound loop")
+      assert(interruptYielded, "interrupt handler yielded during the CPU-bound loop")
 
       assert(hostTimerRan, "timer ran while evaluation was suspended")
     })

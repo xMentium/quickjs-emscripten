@@ -1483,13 +1483,12 @@ JSValueConst *QTS_ArgvGetJSValueConstPointer(JSValueConst *argv, int index) {
 // --------------------
 // interrupt: C -> Host
 #ifdef __EMSCRIPTEN__
-EM_JS(int, qts_host_interrupt_handler, (JSRuntime * rt), {
-  // Async not supported here.
-  // #ifdef QTS_ASYNCIFY
-  //   const asyncify = Asyncify;
-  // #else
+EM_JS(MaybeAsync(int), qts_host_interrupt_handler, (JSRuntime * rt), {
+#ifdef QTS_ASYNCIFY
+  const asyncify = {['handleSleep'] : Asyncify.handleSleep};
+#else
   const asyncify = undefined;
-  // #endif
+#endif
   return Module['callbacks']['shouldInterrupt'](asyncify, rt);
 });
 #endif

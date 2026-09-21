@@ -25,7 +25,7 @@ import { HostRefMap } from "./host-ref"
  * @returns `true` to interrupt JS execution inside the VM.
  * @returns `false` or `undefined` to continue JS execution inside the VM.
  */
-export type InterruptHandler = (runtime: QuickJSRuntime) => boolean | undefined | void
+export type InterruptHandler = (runtime: QuickJSRuntime) => boolean | undefined | void | Promise<boolean>
 
 /**
  * Used as an optional for the results of executing pendingJobs.
@@ -394,7 +394,7 @@ export class QuickJSRuntime extends UsingDisposable implements Disposable {
       this.hostRefs.delete(host_ref_id)
     },
 
-    shouldInterrupt: (rt) => {
+    shouldInterrupt: maybeAsyncFn(this, function* (awaited, rt) {
       if (rt !== this.rt.value) {
         throw new Error("QuickJSContext instance received C -> JS interrupt with mismatched rt")
       }
@@ -404,8 +404,8 @@ export class QuickJSRuntime extends UsingDisposable implements Disposable {
         throw new Error("QuickJSContext had no interrupt handler")
       }
 
-      return fn(this) ? 1 : 0
-    },
+      return (yield* awaited(fn(this))) ? 1 : 0
+    }),
 
     loadModuleSource: maybeAsyncFn(this, function* (awaited, rt, ctx, moduleName) {
       const moduleLoader = this.moduleLoader

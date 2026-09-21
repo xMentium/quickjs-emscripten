@@ -1227,10 +1227,7 @@ function asyncContextTests(
     it("resumes CPU-bound evaluation after an async interrupt", async () => {
       // Arrange
       let interruptCount = 0
-      let timerTickCount = 0
-      const interval = setInterval(() => {
-        timerTickCount++
-      }, 1)
+      let hostTimerRan = false
       vm.runtime.setInterruptHandler(() => {
         interruptCount++
         if (interruptCount !== 1) {
@@ -1238,27 +1235,26 @@ function asyncContextTests(
         }
 
         return new Promise((resolve) => {
-          setTimeout(() => resolve(false), 0)
+          setTimeout(() => {
+            hostTimerRan = true
+          }, 0)
+          setTimeout(() => resolve(false), 10)
         })
       })
 
       // Act
-      try {
-        const result = await vm.evalCodeAsync(`
-          let result = 0;
-          for (let i = 0; i < 1_000_000; i++) {
-            result += i;
-          }
-          result;
-        `)
+      const result = await vm.evalCodeAsync(`
+        let result = 0;
+        for (let i = 0; i < 1_000_000; i++) {
+          result += i;
+        }
+        result;
+      `)
 
-        // Assert
-        assert.equal(vm.unwrapResult(result).consume(vm.dump), 499999500000)
-      } finally {
-        clearInterval(interval)
-      }
+      // Assert
+      assert.equal(vm.unwrapResult(result).consume(vm.dump), 499999500000)
 
-      assert(timerTickCount > 0, "timer ran while evaluation was suspended")
+      assert(hostTimerRan, "timer ran while evaluation was suspended")
     })
 
     it("sees Promise<handle> as synchronous", async () => {

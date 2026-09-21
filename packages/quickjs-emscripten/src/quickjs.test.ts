@@ -1224,6 +1224,54 @@ function asyncContextTests(
   })
 
   describe("asyncify functions", () => {
+    it("resumes CPU-bound evaluation after an async interrupt", async () => {
+      // Arrange
+      let isEvaluating = false
+      let loopEntryCount = 0
+      let interruptYielded = false
+      let hostTimerRan = false
+      vm.newFunction("markLoopEntry", () => {
+        loopEntryCount++
+        return vm.undefined
+      }).consume((fn) => vm.setProp(vm.global, "markLoopEntry", fn))
+      vm.runtime.setInterruptHandler(() => {
+        if (!isEvaluating || interruptYielded) {
+          return false
+        }
+
+        interruptYielded = true
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            hostTimerRan = true
+          }, 0)
+          setTimeout(() => resolve(false), 10)
+        })
+      })
+
+      // Act
+      let result: Awaited<ReturnType<typeof vm.evalCodeAsync>>
+      isEvaluating = true
+      try {
+        result = await vm.evalCodeAsync(`
+          markLoopEntry();
+          let result = 0;
+          for (let i = 0; i < 1_000_000; i++) {
+            result += i;
+          }
+          result;
+        `)
+      } finally {
+        isEvaluating = false
+      }
+
+      // Assert
+      assert.equal(vm.unwrapResult(result).consume(vm.dump), 499999500000)
+      assert.equal(loopEntryCount, 1, "evaluation did not restart after yielding")
+      assert(interruptYielded, "interrupt handler yielded while evaluation was running")
+
+      assert(hostTimerRan, "timer ran while evaluation was suspended")
+    })
+
     it("sees Promise<handle> as synchronous", async () => {
       let asyncFunctionCalls = 0
       const asyncFn = async () => {

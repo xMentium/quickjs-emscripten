@@ -164,14 +164,14 @@ $(BUILD_QUICKJS)/%.o: $(QUICKJS_ROOT)/%.c $(WASM_SYMBOLS) | $(EMCC_SRC)
 	$(MKDIRP)
 	$(EMCC) $(CFLAGS_WASM) $(QUICKJS_DEFINES) -c -o $@ $<
 
-$(BUILD_WRAPPER)/symbols.json:
+$(BUILD_WRAPPER)/symbols.json: $(WRAPPER_ROOT)/interface.c
 	$(MKDIRP)
 	$(GENERATE_TS) symbols $@
 
-$(BUILD_WRAPPER)/asyncify-remove.json:
+$(BUILD_WRAPPER)/asyncify-remove.json: $(WRAPPER_ROOT)/interface.c
 	$(MKDIRP)
 	$(GENERATE_TS) sync-symbols $@
 
-$(BUILD_WRAPPER)/asyncify-imports.json:
+$(BUILD_WRAPPER)/asyncify-imports.json: $(WRAPPER_ROOT)/interface.c
 	$(MKDIRP)
 	$(GENERATE_TS) async-callback-symbols $@

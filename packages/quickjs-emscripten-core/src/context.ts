@@ -1544,7 +1544,8 @@ export class QuickJSContext
    */
   dumpBytecode(
     handle: QuickJSHandle,
-    flags: number = WriteObjectFlags.JS_WRITE_OBJ_BYTECODE | WriteObjectFlags.JS_WRITE_OBJ_REFERENCE,
+    flags: number = WriteObjectFlags.JS_WRITE_OBJ_BYTECODE |
+      WriteObjectFlags.JS_WRITE_OBJ_REFERENCE,
   ): Uint8Array {
     this.runtime.assertOwned(handle)
     const ptr = this.ffi.QTS_WriteObject(this.ctx.value, handle.value, flags)
@@ -1553,11 +1554,11 @@ export class QuickJSContext
       this.ffi.QTS_FreeValuePointer(this.ctx.value, ptr)
       throw this.unwrapResult(this.fail(this.memory.heapValueHandle(errorPtr)))
     }
-    return this.memory.heapValueHandle(ptr).consume((bytecodeHandle) =>
-      this.getArrayBuffer(bytecodeHandle).consume(
-        (bytes) => new Uint8Array(bytes.value.slice()),
-      ),
-    )
+    return this.memory
+      .heapValueHandle(ptr)
+      .consume((bytecodeHandle) =>
+        this.getArrayBuffer(bytecodeHandle).consume((bytes) => new Uint8Array(bytes.value.slice())),
+      )
   }
 
   /**

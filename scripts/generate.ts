@@ -223,21 +223,15 @@ function renderFunction(args: {
 
   const ffiParams = JSON.stringify(params.map((param) => param.type.ffi))
   const cwrapArgs = [JSON.stringify(functionName), JSON.stringify(returnType.ffi), ffiParams]
-  if (context.DEBUG && async) {
+  if (async) {
     // https://emscripten.org/docs/porting/asyncify.html#usage-with-ccall
     // Passing {async:true} to cwrap/ccall will wrap all return values in
     // Promise.resolve(...), even if the c code doesn't suspend and returns a
     // primitive value.
     //
-    // When compiled with -s ASSERTIONS=1, Emscripten will throw if the
-    // function suspends and {async: true} wasn't passed.
-    //
-    // However, we'd like to avoid Promise/async overhead if the call can
-    // return a primitive value directly. So, we compile in {async:true}
-    // only in DEBUG mode, where assertions are enabled.
-    //
-    // Then we rely on our type system to ensure our code supports both
-    // primitive and promise-wrapped return values in production mode.
+    // Asyncify returns a sentinel from an exported function while suspended.
+    // Emscripten converts that sentinel into the eventual result only when
+    // cwrap uses {async: true}.
     cwrapArgs.push("{ async: true }")
   }
 

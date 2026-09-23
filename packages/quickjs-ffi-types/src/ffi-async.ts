@@ -193,6 +193,10 @@ export interface QuickJSAsyncFFI {
     ctx: JSContextPointer,
     fun_obj: JSValuePointer | JSValueConstPointer,
   ) => JSValuePointer
+  QTS_EvalFunction_MaybeAsync: (
+    ctx: JSContextPointer,
+    fun_obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer | Promise<JSValuePointer>
   QTS_ResolveModule: (
     ctx: JSContextPointer,
     obj: JSValuePointer | JSValueConstPointer,

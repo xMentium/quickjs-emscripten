@@ -1224,6 +1224,60 @@ function asyncContextTests(
   })
 
   describe("asyncify functions", () => {
+    it("yields while evaluating trusted bytecode", async () => {
+      // Arrange
+      let isEvaluating = false
+      let interruptYielded = false
+      let hostTimerRan = false
+      vm.runtime.setInterruptHandler(() => {
+        if (!isEvaluating || interruptYielded) {
+          return false
+        }
+
+        interruptYielded = true
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            hostTimerRan = true
+          }, 0)
+          setTimeout(() => resolve(false), 10)
+        })
+      })
+      const compiled = vm.unwrapResult(
+        await vm.compileToBytecodeHandle(
+          `
+            let result = 0;
+            for (let index = 0; index < 1_000_000; index++) {
+              result += index;
+            }
+            globalThis.total = result;
+          `,
+          "main.ts",
+          { type: "global" },
+        ),
+      )
+      const bytecode = vm.dumpBytecode(compiled)
+      compiled.dispose()
+      const loaded = vm.unwrapResult(await vm.loadBytecode(bytecode))
+
+      // Act
+      const result = await (async () => {
+        isEvaluating = true
+        try {
+          return await vm.evalFunctionAsync(loaded)
+        } finally {
+          isEvaluating = false
+          loaded.dispose()
+        }
+      })()
+
+      // Assert
+      vm.unwrapResult(result).dispose()
+      using total = vm.getProp(vm.global, "total")
+      assert.equal(vm.getNumber(total), 499999500000)
+      assert(interruptYielded, "interrupt handler yielded while bytecode was running")
+      assert(hostTimerRan, "timer ran while bytecode evaluation was suspended")
+    })
+
     it("resumes CPU-bound evaluation after an async interrupt", async () => {
       // Arrange
       let isEvaluating = false

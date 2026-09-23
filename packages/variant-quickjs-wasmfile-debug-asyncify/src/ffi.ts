@@ -381,7 +381,19 @@ export class QuickJSAsyncFFI {
   QTS_EvalFunction: (
     ctx: JSContextPointer,
     fun_obj: JSValuePointer | JSValueConstPointer,
-  ) => JSValuePointer = this.module.cwrap("QTS_EvalFunction", "number", ["number", "number"])
+  ) => JSValuePointer = assertSync(
+    this.module.cwrap("QTS_EvalFunction", "number", ["number", "number"]),
+  )
+
+  QTS_EvalFunction_MaybeAsync: (
+    ctx: JSContextPointer,
+    fun_obj: JSValuePointer | JSValueConstPointer,
+  ) => JSValuePointer | Promise<JSValuePointer> = this.module.cwrap(
+    "QTS_EvalFunction",
+    "number",
+    ["number", "number"],
+    { async: true },
+  )
 
   QTS_ResolveModule: (
     ctx: JSContextPointer,

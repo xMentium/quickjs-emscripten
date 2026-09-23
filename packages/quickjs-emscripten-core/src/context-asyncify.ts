@@ -76,6 +76,20 @@ export class QuickJSAsyncContext extends QuickJSContext {
   }
 
   /**
+   * Asyncified version of {@link QuickJSContext.evalFunction}.
+   */
+  async evalFunctionAsync(handle: QuickJSHandle): Promise<QuickJSContextResult<QuickJSHandle>> {
+    this.runtime.assertOwned(handle)
+    const ptr = await this.ffi.QTS_EvalFunction_MaybeAsync(this.ctx.value, handle.value)
+    const errorPtr = this.ffi.QTS_ResolveException(this.ctx.value, ptr)
+    if (errorPtr) {
+      this.ffi.QTS_FreeValuePointer(this.ctx.value, ptr)
+      return this.fail(this.memory.heapValueHandle(errorPtr))
+    }
+    return this.success(this.memory.heapValueHandle(ptr))
+  }
+
+  /**
    * Similar to {@link newFunction}.
    * Convert an async host Javascript function into a synchronous QuickJS function value.
    *

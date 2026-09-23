@@ -979,7 +979,7 @@ MaybeAsync(JSValue *) QTS_Call(JSContext *ctx, JSValueConst *func_obj, JSValueCo
   return jsvalue_to_heap(JS_Call(ctx, *func_obj, *this_obj, argc, argv));
 }
 
-JSValue *QTS_EvalFunction(JSContext *ctx, JSValueConst *fun_obj) {
+MaybeAsync(JSValue *) QTS_EvalFunction(JSContext *ctx, JSValueConst *fun_obj) {
   char msg[LOG_LEN];
   JSValue eval_result = JS_EvalFunction(ctx, JS_DupValue(ctx, *fun_obj));
 
